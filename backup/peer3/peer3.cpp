@@ -12,10 +12,24 @@
 
 using namespace std;
 
+struct DataforThread
+{
+	int fd;
+	int port;
+};
+typedef struct DataforThread threaddata;
+
 void* client(void *clientarg)
 {
 
+	threaddata *cport=(threaddata *)clientarg;
+	int cportn=cport->port;
+
 	cout<<"client of peer \n";
+	//cout<<"ENTER CLIENT PORT";
+	//int port;
+	//while(cin>>port);
+
 	int s_fd;
 
 	s_fd=socket(AF_INET,SOCK_STREAM,0);
@@ -38,33 +52,33 @@ void* client(void *clientarg)
 	struct sockaddr_in ip_server;
 	ip_server.sin_family=AF_INET;
 	ip_server.sin_addr.s_addr =inet_addr("127.0.0.1");
-	ip_server.sin_port=htons(2020);
+	ip_server.sin_port=htons(cportn);
 
 	
 
 	char inp;
-	cout<<"enter c to connect to peer\n ";
+	cout<<"enter c to connect to peert\n ";
 	cin>>inp;
 	int con;
 	if(inp=='c')
 	{
 			con=connect(s_fd,(struct sockaddr*)&ip_server,sizeof(ip_server));
 
-
+				cout<<"after connected \n";
 			
 
 
 			if(con<0)
 			{
 				perror("CANNOT CONNECT");
-				exit(1);
+				//exit(1);
 			}
 
-			char *s;
-			char si[]="hello from peer3";
-			s=si;
+			// char *s;
+			// char si[]="hello from peer3";
+			// s=si;
 
-			send(s_fd,s,strlen(s),0);
+			// send(s_fd,s,strlen(s),0);
 			
 
 			
@@ -107,6 +121,12 @@ void* client(void *clientarg)
 void* server(void *serverarg)
 {
 
+threaddata *sport=(threaddata *)serverarg;
+	int sportn=sport->port;
+	// int port;
+	// cout<<"ENTER SERVER PORT\n";
+	// cin>>port;
+
 	cout<<"server of peer3\n";
 	int s_fd;
 
@@ -134,7 +154,7 @@ void* server(void *serverarg)
 
 	ip_server.sin_family=AF_INET;
 	ip_server.sin_addr.s_addr =INADDR_ANY;
-	ip_server.sin_port=htons(2019);
+	ip_server.sin_port=htons(port);
 
 	int bd=bind(s_fd,(struct sockaddr *)&ip_server,sizeof(ip_server));
 
@@ -214,9 +234,16 @@ void* server(void *serverarg)
 int main()
 {
 
+	threaddata sport,cport;
+	cout<<"ENTER CLIENT PORT \n";
+	cin>>cport.port;
+
+	cout<<"ENTER server PORT \n";
+	cin>>sport.port;
+
 	pthread_t threadserver,threadclient;
-	pthread_create(&threadserver,NULL,server,NULL);
-	pthread_create(&threadclient,NULL,client,NULL);
+	pthread_create(&threadserver,NULL,server,(void *)&sport);
+	pthread_create(&threadclient,NULL,client,(void *)&cport);
 	pthread_join(threadserver,NULL);
 	pthread_join(threadclient,NULL);
 
