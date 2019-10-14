@@ -15,6 +15,7 @@
 using namespace std;
 pthread_mutex_t lockem;
 
+//vector<string,vector<int>>chunks_data;
 
 struct DataforThread
 {
@@ -719,74 +720,113 @@ void *client(void *clientarg)
 					if(strcmp(command,"upload_file")==0)
 					{
 						cout<<"inside upload\n";
-						// if(flag==0)
-						// {   	
-						// 	cout<<"PLEASE LOGIN:\n";
-						// 	//cout<<"hiiiiiiiii\n";
-						// 	//cin.ignore(NULL);
-						
-						// 	continue;
-						// }
+
+						//checks if command parameter are correct
 						char *filepath=strtok(NULL," ");
-						char *g_id=strtok(NULL," ");
-						cout<<"group id is "<<g_id<<"\n";
-						cout<<"file  id is "<<filepath<<"\n";
-						//string send="";
+
+						if(filepath==NULL)
+						{
+							cout<<"INVALID COMMAND\n";
+							continue;
+						}
+
 						
-						FILE *fop=fopen(filepath,"rb"); //rb used for non text files
+						if(flag==0)
+						{
+							cout<<"\nPLEASE LOGIN!!!\n";
+							continue;
+						}
+						//cout<<"file is "<<filepath<<endl;
+
+						//calculate file size and send
+						FILE *fop=fopen(filepath,"rb"); 
 							if(fop<0)
 							{
 								perror("unable to open file");
 								pthread_exit(NULL);
 							}
 
-
+							int ack;
 							//calculate file size
-							cout<<"open file \n";
+							//cout<<"open file \n";
+							rewind(fop);
 							fseek(fop,0,SEEK_END); //data after seek_end+0
 							int fsize=ftell(fop); //gives file pointer location
 							rewind(fop); //sets pointer to beginning of file
+							
 							cout<<fsize<<"\n";
+							
 
-
-							//caluclating sha
-							string sha=sha256_file(fop,fsize);
-							//cout<<"sha is \n"<<sha;
-							//cout<<"\nsize of sha is\n"<<sha.size()<<"\n";
+							//cout<<"after file size "<<endl;
+							
 
 							//sending commandd and other datas
 							string sendata=input1+" "+username+" "+to_string(fsize);
-							fclose(fop);
+							
 							send(s_fd,(char *)sendata.c_str(),sendata.length(),0);
-							int ack;
-							recv(s_fd,&ack,sizeof(ack),0);
+							memset(msg,'\0',sizeof(msg));
+							recv(s_fd,msg,sizeof(msg),0);
+							cout<<"msg "<<msg<<endl;
 
-							//sending sha
-							int shai=0;
-
-							while(shai!=sha.size())
+							if(strcmp(msg,"fail")==0)
 							{
-								string send_sha=sha.substr(shai,20);
-								send(s_fd,(char *)send_sha.c_str(),send_sha.length(),0);
-								cout<<"sent sha "<<send_sha<<endl;
-								//int ack;
-								recv(s_fd,&ack,sizeof(ack),0);
-
-
-								shai+=20;
+								cout<<"NO SUCH GROUP!!"<<endl;
+								send(s_fd,&ack,sizeof(ack),0);
+								continue;	
 							}
-							char* msg;
 
-							msg=(char *)"end";
-							send(s_fd,msg,sizeof(msg),0);
-							recv(s_fd,&ack,sizeof(ack),0);
+							else if(strcmp(msg,"not_member")==0)
+							{
+								cout<<"NOT IN GROUP!!"<<endl;
+								send(s_fd,&ack,sizeof(ack),0);
+								continue;	
+							}
 
-							continue;
+
+							else if(strcmp(msg,"old")==0)
+							{
+								//cout<<"enter old"<<endl;
+								cout<<"UPLOADED!!"<<endl;
+								send(s_fd,&ack,sizeof(ack),0);
+								continue;
+
+							}
+
+							else if(strcmp(msg,"new")==0)
+							{
+								//cout<<"enter new "<<endl;
+								//caluclating sha
+									string sha=sha256_file(fop,fsize);
+									//sending sha
+									int shai=0;
+
+									while(shai!=sha.size())
+									{
+										string send_sha=sha.substr(shai,20);
+										send(s_fd,(char *)send_sha.c_str(),send_sha.length(),0);
+										//cout<<"sent sha "<<send_sha<<endl;
+										//int ack;
+										recv(s_fd,&ack,sizeof(ack),0);
+
+
+										shai+=20;
+									}
+									char* msg;
+
+									msg=(char *)"end";
+									send(s_fd,msg,sizeof(msg),0);
+									fclose(fop);
+									
+									cout<<"UPLOADED FILE!!!";
+									recv(s_fd,&ack,sizeof(ack),0);
+
+									continue;
+							}
 
 
 					}
 				}
-
+//--------------------------------------------------------------------------------------
 			// else if(strcmp(inp,"c")==0)
 			// {
 			// 	con=connect(s_fd,(struct sockaddr*)&ip_server,sizeof(ip_server));

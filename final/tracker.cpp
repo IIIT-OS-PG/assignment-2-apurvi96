@@ -36,21 +36,48 @@ struct user_create
 	int uflag=0;
 
 };
-typedef user_create user_create;
+typedef struct user_create user_create;
 
 unordered_map<string,struct user_create*>user_id_map;
 
 struct group_struct
 {
-	vector<string>group_files;
+	vector<pair<string,int>>group_files;
 	vector<string>group_user;
 	string owner;
 	vector<string>pending_req;
 };
 
-typedef group_struct group_struct;
+typedef struct group_struct group_struct;
 
 unordered_map<string,group_struct*>group_map;
+
+struct file_struct
+{
+	string f_gid;
+	int fsize;
+	string my_sha;
+	vector<string>file_owner;
+	string file_in_gid;
+};
+
+typedef struct file_struct file_struct;
+
+unordered_map<string,file_struct*>file_map;
+// struct file_gid
+// {
+	
+// 	string f_gid;
+// 	int fsize;
+// 	string sha="";
+// 	vector<string>owner;
+// 	string fname;
+	
+// };
+
+// typedef struct file_gid file_gid;
+
+//unordered_map<string,file_gid*>file_map;
 
 struct DataforThread
 {
@@ -127,7 +154,7 @@ void *handlerequest_f(void *request_data)
 						continue;
 					}
 
-				 	 user_create *user_create1=(user_create *)malloc(sizeof(user_create));
+				 	 user_create *user_create1=new user_create;
 				 	 user_create1->password=password1;
 				 	 user_id_map[username]=user_create1;
 				 	 cout<<"received password as : "<<user_id_map[username]->password<<endl;
@@ -195,7 +222,7 @@ void *handlerequest_f(void *request_data)
 					else
 					{
 						//cout<<"inside else\n";
-						group_struct *group_struct1=(group_struct *)malloc(sizeof(group_struct));
+						group_struct *group_struct1=new group_struct;
 						group_struct1->owner=owner;
 						group_struct1->group_user.push_back(owner);
 						group_map[gid]=group_struct1;
@@ -515,53 +542,140 @@ void *handlerequest_f(void *request_data)
 //-------------------------------------------------------------------------------------------------------------------------
 			 	if(strcmp(command1,"upload_file")==0)
 			 	{
-			 		//part of create_user
-			 	// user_info *user_data=(user_info *)malloc(sizeof(user_info));
-			 	// user_data->group_id=strtok(NULL," ");
-			 	// user_data->file=strtok(NULL," ");
-			 	// user_data->port=req_data->cport;
-			 	// user_data->ip=req_data->cip;
-			 	// vector.push(user_data);
-
-
-			 		cout<<"enter ";
-
-				 int rack=1;
-
-
 			 	
-			 	cout<<"sending ack"<<endl;
-				send(client_fd,&rack,sizeof(rack),0);
 
-				//receive sha
-				string sha_coming="";
-				char buffer_sha[25]={'\0'};
-					int n;
-					while(n=recv(client_fd,buffer_sha,sizeof(buffer_sha),0)>0)
+			 		string msg;
+			 		cout<<"enter upload_file\n";
+			 		string filename1=strtok(NULL," ");
+			 		string gid1=strtok(NULL," ");
+			 		string user=strtok(NULL," ");
+					string fsize1=strtok(NULL," ");
+					
+					cout<<"filename 1 "<<filename1<<endl;
+					cout<<"gid1 " <<gid1<<endl;
+					cout<<"user "<<user<<endl;
+					cout<<"fsize1 "<<fsize1<<endl; 
+
+					string key=filename1+gid1;
+					//if user allowed to upload
+										
+					if(group_map.find(gid1)==group_map.end())
 					{
-						//cout<<"enter while"<<endl;
-						if(strcmp(buffer_sha,"end")==0)
-						{
-							//cout<<"sha ended "<<endl;
-							//send(client_fd,&rack,sizeof(rack),0);
+						msg="fail";
+						//auto it=find(group_map[gid]->pending_req.begin(),group_map[gid]->pending_req.end(),user);
+						
+						send(client_fd,(char *)msg.c_str(),sizeof(msg),0);
+						recv(client_fd,&ack,sizeof(ack),0);
+						//cout<<"checked\n";
+					}
 
-							break;
+					else if((find(group_map[gid1]->group_user.begin(),group_map[gid1]->group_user.end(),user))==group_map[gid1]->group_user.end())
+					{
+						msg="not_member";
+						send(client_fd,(char *)msg.c_str(),sizeof(msg),0);
+						recv(client_fd,&ack,sizeof(ack),0);
+						//cout<<"checked\n";
+					}
+
+					//if file already there in list
+
+					else if(file_map.find(key)!=file_map.end())
+					{
+						cout<<"enter old trac"<<endl;
+						msg="old";
+						file_map[key]->file_owner.push_back(user);
+
+						//check sharable 
+						auto check_p=make_pair(filename1,0);
+						auto it=find(group_map[gid1]->group_files.begin(),group_map[gid1]->group_files.end(),check_p);
+
+						if(it!=group_map[gid1]->group_files.end())
+						{
+							it->second=1;
+							cout<<"file is "<<it->first<<endl;
 						}
 
-						string sha_20=buffer_sha;
-						sha_coming+=buffer_sha;
-					//	user_data->sha=sha_coming;
-						//cout<<"sha received "<<sha_20<<endl;
-						send(client_fd,&rack,sizeof(rack),0);
+						else
+							cout<<"already sharable "<<endl;
+						
 
+							
+						send(client_fd,(char *)msg.c_str(),sizeof(msg),0);
+						recv(client_fd,&ack,sizeof(ack),0);
 
+						//cout<<"checked\n";
 					}
-					send(client_fd,&rack,sizeof(rack),0);
 
-					//cout<<"out of while "<<endl;
-					cout<<"recieved sha "<<sha_coming<<endl;
+
+					else
+					{
+					//sending ack
+						cout<<"enter new "<<endl;
+						int rack=1;
+						msg="new";
+						send(client_fd,(char *)msg.c_str(),sizeof(msg),0);
+
+
+							//receive sha
+							string sha_coming="";
+							char buffer_sha[25]={'\0'};
+							int n;
+
+							while(n=recv(client_fd,buffer_sha,sizeof(buffer_sha),0)>0)
+							{
+								//cout<<"enter while"<<endl;
+								if(strcmp(buffer_sha,"end")==0)
+								{
+									//cout<<"sha ended "<<endl;
+									//send(client_fd,&rack,sizeof(rack),0);
+
+									break;
+								}
+
+								string sha_20=buffer_sha;
+								sha_coming+=buffer_sha;
+							//	user_data->sha=sha_coming;
+								//cout<<"sha received "<<sha_20<<endl;
+
+								send(client_fd,&rack,sizeof(rack),0);
+
+
+
+							}
+
+							//insert in group_files
+							group_map[gid1]->group_files.push_back(make_pair(filename1,1));
+
+							string ans=group_map[gid1]->group_files[0].first;
+							cout<<"inserted "<<ans<<endl;
+							
+							//when file is not present in the struct
+
+							file_struct *file_struct1=new file_struct;
+							int fsize2=stoi(fsize1);
+						 	file_struct1->fsize=fsize2;
+						 	cout<<"gid is "<<gid1<<endl;
+						 	file_struct1->f_gid=gid1;
+						 	file_struct1->file_owner.push_back(user);
+						 	file_struct1->file_in_gid=filename1;
+						 	file_struct1->my_sha=sha_coming;
+						 	//file_struct1->file_sha=sha_coming;
+						 	cout<<"checking values "<<endl;
+
+						 	
+						 	file_map[key]=file_struct1;
+						 	cout<<"fsize :"<<file_map[key]->fsize<<endl;
+						 	cout<<"gid :"<<file_map[key]->f_gid<<endl;
+						 	cout<<"file_owner: "<<file_map[key]->file_owner.size()<<endl;
+						 	cout<<"file is : "<<file_map[key]->file_in_gid<<endl;
+						 	cout<<"sha is : "<<file_map[key]->my_sha<<endl;
+						 	send(client_fd,&rack,sizeof(rack),0);
+					}
+					
+					continue;
 					//cout<<"size of sha "<<sha.size()<<endl;
 				}
+//------------------------------------------------------------------------------------------------------------------
 
 		}
 		pthread_exit(NULL);
